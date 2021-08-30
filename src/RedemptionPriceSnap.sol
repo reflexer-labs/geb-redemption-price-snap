@@ -12,7 +12,6 @@ contract RedemptionPriceSnap {
      * @param account Account to add auth to
      */
     function addAuthorization(address account) external isAuthorized {
-        require(contractEnabled == 1, "RedemptionPriceSnap/contract-not-enabled");
         authorizedAccounts[account] = 1;
         emit AddAuthorization(account);
     }
@@ -55,7 +54,7 @@ contract RedemptionPriceSnap {
 
         updatedRelayerDeviation = updatedRelayerDeviation_;
 
-        oracleRelayer           = OracleRelayerLike(OracleRelayerLike_);
+        oracleRelayer           = OracleRelayerLike(oracleRelayer_);
         oracleRelayer.redemptionPrice();
 
         emit AddAuthorization(msg.sender);
@@ -66,6 +65,9 @@ contract RedemptionPriceSnap {
     function subtract(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x, "RedemptionPriceSnap/sub-uint-uint-underflow");
     }
+    function multiply(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require(y == 0 || (z = x * y) / y == x, "RedemptionPriceSnap/multiply-uint-uint-overflow");
+    }
     function delta(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = (x >= y) ? subtract(x, y) : subtract(y, x);
     }
@@ -73,14 +75,14 @@ contract RedemptionPriceSnap {
     // --- Administration ---
     /**
      * @notice Modify general address params
-     * @param parameter The name of the parameter modified
-     * @param data New value for the parameter
+     * @param parameter The name of the contract address being modified
+     * @param data New address for the contract
      */
-    function modifyParameters(bytes32 parameter, uint256 data) external isAuthorized {
+    function modifyParameters(bytes32 parameter, address data) external isAuthorized {
         require(data != address(0), "RedemptionPriceSnap/null-address");
 
         if (parameter == "oracleRelayer") {
-          oracleRelayer = OracleRelayerLike(OracleRelayerLike_);
+          oracleRelayer = OracleRelayerLike(data);
           uint256 latestRedemptionPrice = oracleRelayer.redemptionPrice();
 
           require(latestRedemptionPrice > 0, "RedemptionPriceSnap/null-redemption-price");
@@ -99,7 +101,7 @@ contract RedemptionPriceSnap {
     /**
     * @notice Update and read the latest redemption price
     **/
-    function updateSnappedPrice() external {
+    function updateSnappedPrice() public {
         snappedRedemptionPrice = oracleRelayer.redemptionPrice();
     }
     /**

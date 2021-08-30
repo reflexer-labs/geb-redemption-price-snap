@@ -8,7 +8,6 @@ contract RedemptionPriceSnapTest is DSTest {
     RedemptionPriceSnap snap;
 
     function setUp() public {
-        snap = new RedemptionPriceSnap();
     }
 
     function testFail_basic_sanity() public {
