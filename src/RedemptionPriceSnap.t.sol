@@ -2,13 +2,13 @@ pragma solidity ^0.6.7;
 
 import "ds-test/test.sol";
 
-import "./GebRedemptionPriceSnap.sol";
+import "./RedemptionPriceSnap.sol";
 
-contract GebRedemptionPriceSnapTest is DSTest {
-    GebRedemptionPriceSnap snap;
+contract RedemptionPriceSnapTest is DSTest {
+    RedemptionPriceSnap snap;
 
     function setUp() public {
-        snap = new GebRedemptionPriceSnap();
+        snap = new RedemptionPriceSnap();
     }
 
     function testFail_basic_sanity() public {
