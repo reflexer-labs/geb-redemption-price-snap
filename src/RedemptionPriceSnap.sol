@@ -34,34 +34,30 @@ contract RedemptionPriceSnap {
     // --- Variables ---
     // Latest recorded redemption price
     uint256           public snappedRedemptionPrice;
-    // Used to check deviation from a redemption price in an updated OracleRelayer and the snapped price
-    uint256           public updatedRelayerDeviation;
 
     OracleRelayerLike public oracleRelayer;
 
     // --- Events ---
     event AddAuthorization(address account);
     event RemoveAuthorization(address account);
+    event ModifyParameters(bytes32 parameter, address data);
+    event FailUpdateSnappedPrice(bytes revertReason);
 
     constructor(
-      address oracleRelayer_,
-      uint256 updatedRelayerDeviation_
+      address oracleRelayer_
     ) public {
         require(oracleRelayer_ != address(0), "RedemptionPriceSnap/null-oracle-relayer");
-        require(updatedRelayerDeviation_ < TEN_THOUSAND, "RedemptionPriceSnap/invalid-relayer-deviation");
 
         authorizedAccounts[msg.sender] = 1;
 
-        updatedRelayerDeviation = updatedRelayerDeviation_;
-
-        oracleRelayer           = OracleRelayerLike(oracleRelayer_);
+        oracleRelayer = OracleRelayerLike(oracleRelayer_);
         oracleRelayer.redemptionPrice();
 
         emit AddAuthorization(msg.sender);
     }
 
     // --- Math ---
-    uint256 public TEN_THOUSAND = 10000;
+    uint256 public TEN_THOUSAND = 10000 * 10 ** 27;
     function subtract(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x, "RedemptionPriceSnap/sub-uint-uint-underflow");
     }
@@ -83,18 +79,11 @@ contract RedemptionPriceSnap {
 
         if (parameter == "oracleRelayer") {
           oracleRelayer = OracleRelayerLike(data);
-          uint256 latestRedemptionPrice = oracleRelayer.redemptionPrice();
-
-          require(latestRedemptionPrice > 0, "RedemptionPriceSnap/null-redemption-price");
-
-          if (snappedRedemptionPrice > 0) {
-              require(
-                multiply(delta(latestRedemptionPrice, snappedRedemptionPrice), TEN_THOUSAND) / snappedRedemptionPrice <= updatedRelayerDeviation,
-                "RedemptionPriceSnap/new-redemption-price-far-away-from-snapped"
-              );
-          }
+          require(oracleRelayer.redemptionPrice() > 0, "RedemptionPriceSnap/null-redemption-price");
         }
         else revert("RedemptionPriceSnap/modify-unrecognized-param");
+
+        emit ModifyParameters(parameter, data);
     }
 
     // --- Core Logic ---
@@ -102,7 +91,12 @@ contract RedemptionPriceSnap {
     * @notice Update and read the latest redemption price
     **/
     function updateSnappedPrice() public {
-        snappedRedemptionPrice = oracleRelayer.redemptionPrice();
+        try oracleRelayer.redemptionPrice() returns (uint256 price) {
+          if (price == 0) return;
+          snappedRedemptionPrice = price;
+        } catch(bytes memory revertReason) {
+          emit FailUpdateSnappedPrice(revertReason);
+        }
     }
     /**
     * @notice Read the latest redemption price and return it
